@@ -1,50 +1,87 @@
 <template>
   <div class="account-form">
-    <h1>Учетные записи</h1>
-    <el-button type="primary" @click="addAccount">Добавить учетную запись</el-button>
+    <div class="account-form__header">
+      <h1 class="account-form__title">Учетные записи</h1>
+      <button class="account-form__icon-button account-form__icon-button--add" @click="addAccount">
+        <i class="fas fa-plus"></i>
+      </button>
+    </div>
 
-    <div v-for="(account, index) in accountStore.accounts" :key="index" class="account-entry">
-      <el-input
-        v-model="accountLabelInput[index]"
-        @blur="processLabels(index)"
-        placeholder="Метки (через ;)"
-        :class="{ error: errors[index]?.labels }"
-      />
+    <div v-if="showNotice" class="account-form__notice">
+      <i class="fas fa-circle-question"></i>
+      <span>
+        Для указания нескольких меток для одной пары логин/пароль используйте разделитель ;
+      </span>
+      <button class="account-form__close-button" @click="closeNotice">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
 
-      <el-select v-model="account.type" @change="handleTypeChange(index)">
-        <el-option label="Локальная" value="Локальная" />
-        <el-option label="LDAP" value="LDAP" />
-      </el-select>
+    <div class="account-table">
+      <div class="account-table__header" :class="{ 'account-row--no-password': !hasLocalAccount }">
+        <span class="account-table__column">Метки</span>
+        <span class="account-table__column">Тип записи</span>
+        <span class="account-table__column">Логин</span>
+        <span v-if="hasLocalAccount" class="account-table__column">Пароль</span>
+        <span class="account-table__column"></span>
+      </div>
 
-      <el-input
-        v-model="account.login"
-        @blur="validateLogin(index)"
-        placeholder="Логин"
-        :class="{ error: errors[index]?.login }"
-      />
+      <div
+        v-for="(account, index) in accountStore.accounts"
+        :key="index"
+        :class="['account-row', { 'account-row--ldap': account.type === 'LDAP' }]"
+      >
+        <el-input
+          v-model="accountLabelInput[index]"
+          placeholder="Метки"
+          @blur="processLabels(index)"
+          :class="{ error: errors[index]?.labels }"
+        />
 
-      <el-input
-        v-if="account.type === 'Локальная'"
-        v-model="account.password"
-        show-password
-        @blur="validatePassword(index)"
-        placeholder="Пароль"
-        :class="{ error: errors[index]?.password }"
-      />
+        <el-select v-model="account.type" @change="handleTypeChange(index)">
+          <el-option label="Локальная" value="Локальная" />
+          <el-option label="LDAP" value="LDAP" />
+        </el-select>
 
-      <el-button type="danger" @click="removeAccount(index)">Удалить</el-button>
+        <el-input
+          v-model="account.login"
+          placeholder="Логин"
+          @blur="validateLogin(index)"
+          :class="{ error: errors[index]?.login }"
+        />
+
+        <el-input
+          v-if="account.type === 'Локальная'"
+          v-model="account.password"
+          placeholder="Пароль"
+          show-password
+          @blur="validatePassword(index)"
+          :class="{ error: errors[index]?.password }"
+        />
+
+        <button
+          @click="removeAccount(index)"
+          class="account-form__icon-button account-form__icon-button--delete"
+        >
+          <i class="fas fa-trash"></i>
+        </button>
+      </div>
     </div>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { reactive, onMounted } from 'vue'
+import { reactive, ref, onMounted, computed } from 'vue'
 import { useAccountStore, type Account } from '@/stores/accountStore'
-import { ElMessage } from 'element-plus'
 
 const accountStore = useAccountStore()
 const errors = reactive<{ [key: number]: any }>({})
 const accountLabelInput = reactive<{ [key: number]: string }>({})
+const showNotice = ref(true)
+
+const hasLocalAccount = computed(() =>
+  accountStore.accounts.some((account) => account.type === 'Локальная'),
+)
 
 onMounted(() => {
   accountStore.loadAccounts()
@@ -71,17 +108,18 @@ const processLabels = (index: number) => {
     .map((label) => label.trim())
     .filter((label) => label !== '')
     .map((label) => ({ text: label }))
+
   if (labels.some((label) => label.text.length > 50)) {
     errors[index] = { ...errors[index], labels: true }
   } else {
     errors[index] = { ...errors[index], labels: false }
     accountStore.accounts[index].labels = labels
-    accountStore.saveAccounts()
+    accountStore.updateAccount(index, accountStore.accounts[index])
   }
 }
 
 const validateLogin = (index: number) => {
-  const login = accountStore.accounts[index].login
+  const login = accountStore.accounts[index].login.trim()
   errors[index] = {
     ...errors[index],
     login: !login || login.length > 100,
@@ -90,11 +128,21 @@ const validateLogin = (index: number) => {
 }
 
 const validatePassword = (index: number) => {
-  const password = accountStore.accounts[index].password || ''
-  errors[index] = {
-    ...errors[index],
-    password: password.length === 0 || password.length > 100,
+  const account = accountStore.accounts[index]
+  const password = account.password?.trim() || ''
+
+  if (account.type === 'Локальная') {
+    errors[index] = {
+      ...errors[index],
+      password: !password || password.length > 100,
+    }
+  } else {
+    errors[index] = {
+      ...errors[index],
+      password: false,
+    }
   }
+
   if (!errors[index].password) accountStore.saveAccounts()
 }
 
@@ -105,27 +153,141 @@ const handleTypeChange = (index: number) => {
   }
   accountStore.saveAccounts()
 }
+
+const closeNotice = () => {
+  showNotice.value = false
+}
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
 .account-form {
   display: flex;
   flex-direction: column;
-  gap: 24px;
-  max-width: 800px;
-  margin: 0 auto;
-}
-
-.account-entry {
-  display: flex;
-  flex-wrap: wrap;
   gap: 16px;
-  padding: 16px;
-  border: 1px solid #ccc;
-  border-radius: 8px;
+  max-width: 1000px;
+  margin: 0 auto;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    & h1 {
+      margin: 0;
+      font-size: 24px;
+    }
+  }
+
+  &__icon-button {
+    background: none;
+    cursor: pointer;
+    font-size: 18px;
+    padding: 6px;
+    transition: 0.2s ease-in-out;
+
+    &:hover {
+      color: #007bff;
+    }
+
+    &--delete {
+      color: #ff4d4f;
+      padding: 0;
+      border: none;
+
+      &:hover {
+        color: #d9363e;
+      }
+    }
+
+    &--add {
+      border: 1px solid #007bff;
+      border-radius: 4px;
+      padding: 10px;
+    }
+  }
+
+  &__notice {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background-color: #f0f8ff;
+    border: 1px solid #b3d4fc;
+    padding: 12px;
+    border-radius: 8px;
+    position: relative;
+  }
+
+  &__close-button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    font-size: 16px;
+    color: #777;
+
+    &:hover {
+      color: #000;
+    }
+  }
 }
 
-.error {
-  border-color: red !important;
+.account-table {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+
+  &__header {
+    display: grid;
+    grid-template-columns: 21% 17% 36% 10%;
+    width: 100%;
+    font-weight: bold;
+    padding: 8px;
+    border-bottom: 1px solid #ccc;
+    background-color: #f8f9ff;
+
+    &__column {
+      padding: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      border-right: 1px solid #e0e0e0;
+
+      &:last-child {
+        border-right: none;
+      }
+    }
+  }
+}
+
+.account-row {
+  display: grid;
+  grid-template-columns: 200px 150px 1fr 200px 50px;
+  align-items: center;
+  padding: 8px 0;
+  width: 100%;
+  gap: 12px;
+
+  &--ldap {
+    grid-template-columns: 200px 150px 1fr 50px;
+  }
+
+  .el-input,
+  .el-select {
+    width: 100%;
+  }
+
+  .error {
+    border-color: red !important;
+    box-shadow: 0 0 4px rgba(255, 0, 0, 0.5);
+  }
+}
+
+.error-message {
+  color: red;
+  font-size: 12px;
+  margin-top: 4px;
 }
 </style>
