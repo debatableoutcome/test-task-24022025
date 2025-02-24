@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { reactive } from 'vue'
 
 export interface Account {
   labels: { text: string }[]
@@ -9,21 +10,25 @@ export interface Account {
 
 export const useAccountStore = defineStore('accountStore', {
   state: () => ({
-    accounts: [] as Account[],
+    accounts: reactive([] as Account[]),
   }),
+
   actions: {
     addAccount(account: Account) {
+      account.labels = this.normalizeLabels(account.labels)
       this.accounts.push(account)
       this.saveAccounts()
     },
 
     removeAccount(index: number) {
+      const removedAccount = this.accounts[index]
       this.accounts.splice(index, 1)
       this.saveAccounts()
     },
 
     updateAccount(index: number, updatedAccount: Account) {
-      this.accounts[index] = updatedAccount
+      updatedAccount.labels = this.normalizeLabels(updatedAccount.labels)
+      this.accounts[index] = { ...updatedAccount }
       this.saveAccounts()
     },
 
@@ -34,13 +39,23 @@ export const useAccountStore = defineStore('accountStore', {
     loadAccounts() {
       const savedAccounts = localStorage.getItem('accounts')
       if (savedAccounts) {
-        this.accounts = JSON.parse(savedAccounts).map((account: Account) => ({
-          ...account,
-          labels: Array.isArray(account.labels)
-            ? account.labels.map((label) => (typeof label === 'string' ? { text: label } : label))
-            : [],
-        }))
+        const parsedAccounts = JSON.parse(savedAccounts)
+        this.accounts.splice(
+          0,
+          this.accounts.length,
+          ...parsedAccounts.map((account: Account) => ({
+            ...account,
+            labels: this.normalizeLabels(account.labels),
+          })),
+        )
       }
+    },
+
+    normalizeLabels(labels: any): { text: string }[] {
+      if (Array.isArray(labels)) {
+        return labels.map((label) => (typeof label === 'string' ? { text: label } : label))
+      }
+      return []
     },
   },
 })

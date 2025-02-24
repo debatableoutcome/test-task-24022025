@@ -85,6 +85,9 @@ const hasLocalAccount = computed(() =>
 
 onMounted(() => {
   accountStore.loadAccounts()
+  accountStore.accounts.forEach((account, index) => {
+    accountLabelInput[index] = account.labels.map((label) => label.text).join('; ')
+  })
 })
 
 const addAccount = () => {
