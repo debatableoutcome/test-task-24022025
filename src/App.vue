@@ -3,7 +3,7 @@
 </template>
 
 <script lang="ts" setup>
-import AccountForm from './components/AccountForm'
+import AccountForm from './components/AccountForm/AccountForm.vue'
 </script>
 
 <style>
