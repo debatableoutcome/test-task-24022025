@@ -215,9 +215,10 @@ const closeNotice = () => {
     gap: 12px;
     background-color: #f0f8ff;
     border: 1px solid #b3d4fc;
-    padding: 12px;
+    padding: 32px 0px 24px 8px;
     border-radius: 8px;
     position: relative;
+    width: calc(100% - 8px);
   }
 
   &__close-button {
@@ -240,11 +241,13 @@ const closeNotice = () => {
   display: flex;
   flex-direction: column;
   width: 100%;
+  overflow-x: auto;
 
   &__header {
     display: grid;
-    grid-template-columns: 21% 17% 36% 10%;
+    grid-template-columns: 205px 170px 355px 50px;
     width: 100%;
+    min-width: 1000px;
     font-weight: bold;
     padding: 8px;
     border-bottom: 1px solid #ccc;
@@ -271,6 +274,7 @@ const closeNotice = () => {
   align-items: center;
   padding: 8px 0;
   width: 100%;
+  min-width: 1000px;
   gap: 12px;
 
   &--ldap {
@@ -292,5 +296,11 @@ const closeNotice = () => {
   color: red;
   font-size: 12px;
   margin-top: 4px;
+}
+
+@media (max-width: 768px) {
+  .account-table {
+    overflow-x: auto;
+  }
 }
 </style>
